@@ -160,6 +160,11 @@ async function launchDesktop(theme: Theme, kubeconfig: string, env: Record<strin
   await page.emulateMedia({ reducedMotion: 'reduce' })
   return {
     page,
+    /** What the page shows, at the density set above (Playwright's would be the screen's). */
+    async screenshot() {
+      const { data } = await cdp.send('Page.captureScreenshot', { format: 'png' })
+      return Buffer.from(data, 'base64')
+    },
     /** Opens `path` afresh, as if the app had just started there. */
     async open(path: string) {
       await page.evaluate((hash) => {
@@ -247,7 +252,7 @@ const PROXY_HEADERS = {
 }
 
 /** A screenshot of the page once it's settled: nothing loading, and nothing changing. */
-async function capture(page: Page): Promise<Buffer> {
+async function capture(page: Page, screenshot: () => Promise<Buffer>): Promise<Buffer> {
   await page.waitForFunction(() => !document.querySelector('.animate-spin'), undefined, {
     timeout: 30_000,
   })
@@ -264,10 +269,10 @@ async function capture(page: Page): Promise<Buffer> {
   })
   // Out of the way of anything that shows on hover.
   await page.mouse.move(WIDTH / 2, 2)
-  let shot = await page.screenshot({ animations: 'disabled' })
+  let shot = await screenshot()
   for (let tries = 0; tries < 40; tries++) {
     await page.waitForTimeout(250)
-    const next = await page.screenshot({ animations: 'disabled' })
+    const next = await screenshot()
     if (next.equals(shot)) return next
     shot = next
   }
@@ -279,11 +284,15 @@ const failed: string[] = []
 let unchanged = 0
 
 /** Opens a screen afresh, does its steps, and captures it. */
-async function shoot(screen: Screen, page: Page): Promise<Buffer> {
+async function shoot(
+  screen: Screen,
+  page: Page,
+  screenshot: () => Promise<Buffer> = () => page.screenshot(),
+): Promise<Buffer> {
   try {
     await page.waitForTimeout(500)
     await screen.steps?.(page)
-    const png = await capture(page)
+    const png = await capture(page, screenshot)
     await screen.after?.(page)
     await sizeCheck(png)
     return png
@@ -349,7 +358,7 @@ try {
       for (const screen of desktop) {
         await take(screen, theme, async () => {
           await app.open(screen.path)
-          return shoot(screen, app.page)
+          return shoot(screen, app.page, app.screenshot)
         })
       }
     } finally {
