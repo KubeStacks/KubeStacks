@@ -393,22 +393,20 @@ export async function startMockCluster(options: MockClusterOptions): Promise<Moc
     const secured = options.token !== undefined || options.users !== undefined
     const user = !secured ? ADMIN : token === options.token ? ADMIN : users.get(token ?? '')
     if (!user) return { refused: 401, message: 'Unauthorized' }
+    // Who they act as: themselves, or (when they may impersonate) whoever they say.
     const as = req.headers['impersonate-user']
-    const authenticated = (u: MockUser) => ({
-      ...u,
-      groups: [...(u.groups ?? []), 'system:authenticated'],
-    })
-    if (as === undefined) return authenticated(user)
-    if (!user.impersonate) {
+    if (as !== undefined && !user.impersonate) {
       return {
         refused: 403,
         message: `users "${as}" is forbidden: User "${user.username}" cannot impersonate resource "users" in API group "" at the cluster scope`,
       }
     }
-    return authenticated({
-      username: String(as),
-      groups: req.headersDistinct['impersonate-group'] ?? [],
-    })
+    const who: MockUser =
+      as === undefined
+        ? user
+        : { username: String(as), groups: req.headersDistinct['impersonate-group'] ?? [] }
+    // Everyone signed in is in system:authenticated.
+    return { ...who, groups: [...(who.groups ?? []), 'system:authenticated'] }
   }
 
   const jitter = (seed: string) => {
