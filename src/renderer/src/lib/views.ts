@@ -25,27 +25,35 @@ export const VIEW_ICON_NAMES = [
   'bell',
   'box',
   'boxes',
+  'bug',
+  'camera',
   'cloud',
   'database',
+  'file-check',
   'flame',
   'gauge',
   'git-branch',
   'git-merge',
   'globe',
+  'hexagon',
   'key-round',
   'layers',
   'lock',
   'network',
   'package',
+  'play',
   'puzzle',
   'radar',
   'refresh-cw',
   'rocket',
   'route',
+  'scaling',
   'server',
   'server-cog',
   'shield-check',
+  'signpost',
   'timer',
+  'waves',
   'waypoints',
   'workflow',
 ] as const
@@ -368,12 +376,12 @@ const ADD_ON_SHAPE: Shape = {
  * `{{ .path }}` in a template, with a fallback for when it finds nothing:
  * `{{ .path ?? "text" }}` or `{{ .path ?? .other.path }}`. `{{ now }}` is the time.
  */
-const PLACEHOLDER = /\{\{\s*(.*?)\s*\}\}/g
-const EXPRESSION = /^(\S+?)(?:\s*\?\?\s*(?:"([^"]*)"|(\.\S*)))?$/
+export const PLACEHOLDER = /\{\{\s*(.*?)\s*\}\}/g
+export const EXPRESSION = /^(\S+?)(?:\s*\?\?\s*(?:"([^"]*)"|(\.\S*)))?$/
 /** `{{ input.name }}`: an action's input, wherever it is in a template. */
 const INPUT_PLACEHOLDER = /\{\{\s*input\.(\w+)/g
-/** A template that's only an input, a value of its own. */
-const ONLY_INPUT = /^\{\{\s*input\.(\w+)\s*\}\}$/
+/** A template that's one placeholder and nothing else: a value of its own. */
+const ONLY_PLACEHOLDER = /^\{\{\s*([^{}]*?)\s*\}\}$/
 /** An input's value as a path in a template. */
 const INPUT_PATH = /^input\.\w+$/
 
@@ -626,24 +634,39 @@ export function render(
 }
 
 /**
- * Fills in the templates in a patch (or an object to create). A number input
- * that's a whole value is a number, except in labels and annotations, whose
- * values are always text.
+ * Fills in the templates in a patch (or an object to create). A placeholder
+ * that's a whole value stands for the value itself, not its text: a number,
+ * a list, an object to copy, and nothing at all (the field is left out) when
+ * it finds nothing. Labels and annotations are always text.
  */
 export function renderPatch<T>(patch: T, object: unknown, now: number, inputs: InputValues): T {
+  const found = (path: string): unknown => {
+    if (INPUT_PATH.test(path)) {
+      const value = inputs[path.slice('input.'.length)]!
+      return value === '' ? undefined : value
+    }
+    const values = jsonPath(object, path)
+    return values.length > 1 ? values : values[0]
+  }
+  const valueOf = (expression: string): unknown => {
+    const [, path, literal, fallback] = EXPRESSION.exec(expression)!
+    return found(path!) ?? (fallback ? found(fallback) : literal)
+  }
   const fill = (value: unknown, text: boolean): unknown => {
     if (typeof value === 'string') {
-      const only = ONLY_INPUT.exec(value)
-      const raw = only && inputs[only[1]!]
-      return !text && typeof raw === 'number' ? raw : render(value, object, now, inputs)
+      const only = ONLY_PLACEHOLDER.exec(value)
+      return !only || text || only[1] === 'now'
+        ? render(value, object, now, inputs)
+        : valueOf(only[1]!)
     }
-    if (Array.isArray(value)) return value.map((item) => fill(item, text))
+    if (Array.isArray(value)) {
+      return value.map((item) => fill(item, text)).filter((item) => item !== undefined)
+    }
     if (value === null || typeof value !== 'object') return value
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        key,
-        fill(item, text || key === 'labels' || key === 'annotations'),
-      ]),
+      Object.entries(value)
+        .map(([key, item]) => [key, fill(item, text || key === 'labels' || key === 'annotations')])
+        .filter(([, item]) => item !== undefined),
     )
   }
   return fill(patch, false) as T

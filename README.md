@@ -204,6 +204,11 @@ and the [Changelog](CHANGELOG.md).
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) first, and
 [docs/development.md](docs/development.md) to build and test KubeStacks.
 
+A good first contribution is support for a tool you run: an add-on and views, written as YAML
+and checked against the tool's CRDs, with no code to write. See
+[Adding a tool](CONTRIBUTING.md#adding-a-tool), and the
+[tools waiting for one](https://github.com/KubeStacks/KubeStacks/issues?q=is%3Aissue+is%3Aopen+label%3Aadd-on).
+
 ## Sponsoring
 
 KubeStacks is free and open source, made in spare time. If it saves you time, you can

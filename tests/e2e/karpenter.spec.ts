@@ -273,8 +273,9 @@ test('what Karpenter replaces, launches and waits for, as it changes', async ({
   await expect(nodes.getByRole('listitem')).toHaveCount(11)
 })
 
-test('a cluster where Karpenter has nothing to do yet', async ({ page }) => {
-  // Opened straight away, before anything has loaded.
+test('a cluster where Karpenter has nothing to do yet', async ({ page, clusters }) => {
+  // Opened straight away, while the nodes are still on their way.
+  clusters.sandbox.fail('/api/v1/nodes', { delayMs: 3000 })
   await page.evaluate(() => {
     window.location.hash = '#/cluster/sandbox/add-ons/karpenter'
   })

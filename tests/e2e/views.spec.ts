@@ -501,8 +501,18 @@ spec:
         kind: Widget
         metadata:
           generateName: '{{ .metadata.name }}-copy-'
-          labels: { app.kubernetes.io/name: widgets }
-        spec: { size: 1, color: '{{ .spec.color }}' }
+          labels: { app.kubernetes.io/name: widgets, size: '{{ .spec.size }}' }
+        # Values on their own are copied as they are; labels are always text.
+        spec:
+          size: '{{ .spec.size }}'
+          color: '{{ .spec.color }}'
+          aliases: '{{ .spec.aliases[*] }}'
+          parts: '{{ .spec.parts }}'
+          note: '{{ .spec.missing }}'
+          shade: '{{ .spec.missing ?? "plain" }}'
+          tint: '{{ .spec.missing ?? .spec.color }}'
+          copied: '{{ now }}'
+          tags: ['{{ .spec.missing }}', copy]
       done: Cloned {{ .metadata.name }}
     - name: Copy to shop
       create:
@@ -687,12 +697,31 @@ test('view actions that ask for values, and ones that create objects', async ({
     /kubectl create -f blue-widget-copy-\w{5}\.yaml -n default/,
   )
   await expect(form.getByLabel('Widget to create')).toContainText('color: blue')
+  await expect(form.getByLabel('Widget to create')).not.toContainText('note')
   await form.getByRole('button', { name: 'Clone', exact: true }).click()
   await expect(toasts(page)).toContainText('Cloned blue-widget')
   const created = writes(clusters.demo, 'POST', '/apis/example.com/v1/namespaces/default/widgets')
-  expect(created.at(-1)!.body).toMatchObject({
-    metadata: { name: expect.stringMatching(/^blue-widget-copy-\w{5}$/), namespace: 'default' },
-    spec: { size: 1, color: 'blue' },
+  const clone = created.at(-1)!.body
+  expect(clone).toMatchObject({
+    metadata: {
+      name: expect.stringMatching(/^blue-widget-copy-\w{5}$/),
+      namespace: 'default',
+      // (Resized to 4 above.)
+      labels: { 'app.kubernetes.io/name': 'widgets', size: '4' },
+    },
+  })
+  expect(clone.spec).toEqual({
+    size: 4,
+    color: 'blue',
+    aliases: ['bw', 'blu'],
+    parts: [
+      { name: 'bolt', count: 4, spare: false },
+      { name: 'gear', count: 2, spare: true },
+    ],
+    shade: 'plain',
+    tint: 'blue',
+    copied: expect.stringMatching(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/),
+    tags: ['copy'],
   })
   await toasts(page).getByRole('button', { name: 'Open' }).first().click()
   await expect(page.getByRole('complementary', { name: /^Widget blue-widget-copy-/ })).toBeVisible()

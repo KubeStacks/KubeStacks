@@ -132,6 +132,10 @@ test('the command palette finds add-ons, and their pages say when a cluster lack
   await page.getByRole('option', { name: /^Argo Rollouts/ }).click()
   await expect(heading(page)).toHaveText('Argo Rollouts')
   await expect(row(page, 'Argo Rollouts', CUSTOM.rollout)).toBeVisible()
+  // Objects are found by their labels too.
+  await sidebar(page).getByRole('link', { name: 'cert-manager', exact: true }).click()
+  await page.getByPlaceholder('Filter cert-manager').fill('app.kubernetes.io/name=api')
+  await expect(rows(page, 'cert-manager')).toHaveCount(1)
   // Its kinds can be found by name too.
   await page.keyboard.press('ControlOrMeta+k')
   await page.getByRole('combobox').fill('certificates')
