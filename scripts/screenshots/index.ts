@@ -30,6 +30,7 @@ import {
   pixelsOf,
   remove,
   same,
+  sizeCheck,
   WIDTH,
   type Theme,
 } from './images.ts'
@@ -117,7 +118,7 @@ async function launchDesktop(theme: Theme, kubeconfig: string, env: Record<strin
   const cwd = dirname(dirname(kubeconfig))
   const app = await electron.launch({
     cwd,
-    // Shown without a window on screen (see tests/e2e/harness.cjs), at 2× whatever the screen.
+    // Shown without a window on screen (see tests/e2e/harness.cjs).
     args: [
       '-r',
       resolve('tests/e2e/harness.cjs'),
@@ -125,7 +126,6 @@ async function launchDesktop(theme: Theme, kubeconfig: string, env: Record<strin
       resolve('scripts/screenshots/harness.cjs'),
       resolve('.'),
       `--user-data-dir=${home}`,
-      '--force-device-scale-factor=2',
       // Drawn in software: on the GPU, things come out a little differently from time to time.
       '--disable-gpu',
       '--lang=en-US',
@@ -148,11 +148,15 @@ async function launchDesktop(theme: Theme, kubeconfig: string, env: Record<strin
   await app.context().addInitScript(stopClock, EPOCH)
   await app.context().addInitScript(stopAnimations)
   const page = await app.firstWindow()
-  await app.evaluate(
-    ({ BrowserWindow }, [width, height]) =>
-      BrowserWindow.getAllWindows()[0]!.setContentSize(width!, height!),
-    [WIDTH, HEIGHT],
-  )
+  // The page's size and density, set as Playwright sets a browser's: a window can't be bigger
+  // than the screen it's on, and some are small (GitHub's Macs: 1024 × 681 at 2×).
+  const cdp = await app.context().newCDPSession(page)
+  await cdp.send('Emulation.setDeviceMetricsOverride', {
+    width: WIDTH,
+    height: HEIGHT,
+    deviceScaleFactor: 2,
+    mobile: false,
+  })
   await page.emulateMedia({ reducedMotion: 'reduce' })
   return {
     page,
@@ -281,6 +285,7 @@ async function shoot(screen: Screen, page: Page): Promise<Buffer> {
     await screen.steps?.(page)
     const png = await capture(page)
     await screen.after?.(page)
+    await sizeCheck(png)
     return png
   } catch (error) {
     // What it was waiting for, and how the screen looked then.
