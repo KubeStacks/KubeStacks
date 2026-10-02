@@ -102,6 +102,30 @@ subjects:
   - { apiGroup: rbac.authorization.k8s.io, kind: Group, name: 'oidc:platform' }
 ```
 
+#### When the API server trusts the provider itself
+
+If the API server already accepts the provider's tokens (its `--oidc-*` flags, a
+structured authentication configuration, an
+[EKS OIDC identity provider](https://docs.aws.amazon.com/eks/latest/userguide/authenticate-oidc-identity-provider.html)…),
+KubeStacks can pass each person's own token on instead of impersonating them. Its service
+account then needs no permissions at all (the chart doesn't give it any), and the cluster's
+audit log names the person directly.
+
+```yaml
+auth:
+  mode: oidc
+  oidc:
+    # …as above, and:
+    forwardToken: id # or access, for a provider whose access tokens the cluster takes
+    scopes: openid email profile groups offline_access
+```
+
+KubeStacks renews tokens a minute before they expire, with the refresh tokens the provider
+gives it (most need `offline_access` among the scopes for that). Without one, the session
+ends when the cluster stops taking the token, and people sign in again. The token is a JWT
+the cluster checks itself, so names and groups come from the API server's own settings (and
+prefixes), not KubeStacks'.
+
 ### Behind an authenticating proxy
 
 An authenticating proxy, like [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/)
@@ -126,10 +150,11 @@ networkPolicy:
 
 ### What to keep in mind
 
-- With single sign-on or a proxy, KubeStacks' service account may impersonate anyone. Keep
-  it in a namespace only cluster administrators can exec into, and use prefixes, so no
-  group from a provider is one of yours by accident. KubeStacks never acts as Kubernetes'
-  own users or groups (`system:…`), whatever a provider or proxy says.
+- With a proxy, or single sign-on that doesn't pass people's own tokens on, KubeStacks'
+  service account may impersonate anyone. Keep it in a namespace only cluster
+  administrators can exec into, and use prefixes, so no group from a provider is one of
+  yours by accident. KubeStacks never acts as Kubernetes' own users or groups
+  (`system:…`), whatever a provider or proxy says.
 - Sessions live in KubeStacks' memory: restarting it (an upgrade, say) signs everyone out.
   With single sign-on, signing in again is a click. For the same reason the chart runs one
   replica.
@@ -195,6 +220,7 @@ The chart sets these for you; they're for running the image another way.
 | `KUBESTACKS_OIDC_SCOPES`                                 | `openid email profile` unless set.                                                                                                  |
 | `KUBESTACKS_OIDC_USERNAME_CLAIM`, `_GROUPS_CLAIM`        | The ID token's claims that name people and list their groups: `email` and `groups` unless set.                                      |
 | `KUBESTACKS_OIDC_PROVIDER_NAME`                          | The provider's name on the sign-in button.                                                                                          |
+| `KUBESTACKS_OIDC_FORWARD_TOKEN`                          | `id` or `access`: pass people's own token on (the API server must trust the provider) instead of impersonating them.                |
 | `KUBESTACKS_PROXY_USER_HEADER`, `_GROUPS_HEADER`         | The headers a proxy names people and their groups in: `X-Forwarded-User` and `X-Forwarded-Groups` unless set.                       |
 | `KUBESTACKS_PROXY_SIGN_OUT_URL`                          | Where signing out of the proxy is.                                                                                                  |
 | `KUBESTACKS_USERNAME_PREFIX`, `KUBESTACKS_GROUPS_PREFIX` | Prefixed to impersonated users' and groups' names.                                                                                  |

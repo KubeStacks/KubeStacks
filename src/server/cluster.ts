@@ -17,8 +17,9 @@ import { ConfigError } from './config'
 const SERVICE_ACCOUNT = '/var/run/secrets/kubernetes.io/serviceaccount'
 
 /**
- * Someone signed in. With a token, requests carry it, so the cluster checks
- * it; without, the server vouches for them and impersonates them.
+ * Someone signed in. With a token (theirs, or one their provider issued and
+ * renews), requests carry it, so the cluster checks it; without, the server
+ * vouches for them and impersonates them.
  */
 export interface Identity {
   user: SessionUser
@@ -41,6 +42,21 @@ class Impersonating extends KubeConfig {
       'Impersonate-User': this.as.name,
       'Impersonate-Group': this.as.groups,
     }
+  }
+}
+
+/**
+ * Sends the person's own token, as it is when each request is made: one a
+ * provider renews takes over at once, on every page.
+ */
+class Carrying extends KubeConfig {
+  constructor(private readonly identity: Identity) {
+    super()
+  }
+
+  override async applyToHTTPSOptions(options: https.RequestOptions): Promise<void> {
+    await super.applyToHTTPSOptions(options)
+    options.headers = { ...options.headers, Authorization: `Bearer ${this.identity.token}` }
   }
 }
 
@@ -93,14 +109,10 @@ export class HostedCluster {
         },
       ],
     }
-    const kc = as ? new Impersonating(as) : new KubeConfig()
+    const kc = as ? new Impersonating(as) : new Carrying(identity)
     kc.loadFromOptions({
       clusters: [{ ...this.cluster, name: this.name }],
-      users: [
-        identity.token
-          ? { name: 'user', token: identity.token }
-          : { ...this.account, name: 'user' },
-      ],
+      users: [as ? { ...this.account, name: 'user' } : { name: 'user' }],
       contexts: [{ name: this.name, cluster: this.name, user: 'user' }],
       currentContext: this.name,
     })

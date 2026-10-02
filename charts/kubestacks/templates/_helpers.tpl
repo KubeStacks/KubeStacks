@@ -39,7 +39,10 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- if $path }}/{{ $path }}/{{ else }}/{{ end }}
 {{- end }}
 
-{{/* Whether the server impersonates people (with single sign-on, or behind a proxy). */}}
+{{/*
+Whether the server impersonates people: behind a proxy, and with single sign-on unless
+their own tokens are passed on.
+*/}}
 {{- define "kubestacks.impersonates" -}}
-{{- if has .Values.auth.mode (list "oidc" "proxy") }}true{{ end }}
+{{- if or (eq .Values.auth.mode "proxy") (and (eq .Values.auth.mode "oidc") (not .Values.auth.oidc.forwardToken)) }}true{{ end }}
 {{- end }}

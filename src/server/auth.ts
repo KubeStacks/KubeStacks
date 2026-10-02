@@ -12,8 +12,8 @@ import type { HostedCluster, Identity } from './cluster'
 import type { ServerConfig } from './config'
 import { cookie, cookies, readJson, redirect, sameOrigin, secure, sendJson } from './http'
 import { log } from './log'
-import type { OidcClient, PendingSignIn } from './oidc'
-import type { Sessions } from './sessions'
+import type { Forwarded, OidcClient, PendingSignIn, SignedIn } from './oidc'
+import type { Sessions, StoredSession } from './sessions'
 
 export const SESSION_COOKIE = 'kubestacks-session'
 /**
@@ -29,6 +29,8 @@ const signature = (body: string) => createHmac('sha256', KEY).update(body).diges
 const same = (a: string, b: string) =>
   timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest())
 const REVIEWS = '/apis/authentication.k8s.io/v1/selfsubjectreviews'
+/** How long before a passed-on token expires it's renewed. */
+const RENEW_EARLY_MS = 60_000
 
 /** Who a request is from: someone, someone the server won't act as, or nobody. */
 export type Caller = { identity: Identity; session?: string } | { refused: true } | undefined
@@ -152,19 +154,22 @@ export class Auth {
       this.#problem(res, 'denied', new Error(`The provider said ${refusal}`))
       return
     }
-    let user: SessionUser
+    let signedIn: SignedIn
     try {
-      user = await this.oidc!.finish(url.searchParams.get('code') ?? '', pending)
+      signedIn = await this.oidc!.finish(url.searchParams.get('code') ?? '', pending)
     } catch (error) {
       this.#problem(res, 'failed', error)
       return
     }
+    const { user, token } = signedIn
     const refused = this.cluster.refuses(user)
     if (refused) {
       this.#problem(res, 'refused', new Error(refused))
       return
     }
-    const session = this.sessions.create({ user })
+    // Their own token, when the API server trusts the provider; otherwise they're impersonated.
+    const session = this.sessions.create({ user, token })
+    this.#keepFresh(session, signedIn)
     log(`${user.name} signed in`)
     redirect(res, `${this.config.basePath}${pending.then.slice(1)}`, {
       'Set-Cookie': [
@@ -172,6 +177,29 @@ export class Auth {
         cookie(SIGN_IN_COOKIE, '', { path: this.config.basePath, maxAge: 0, secure: false }),
       ],
     })
+  }
+
+  /**
+   * Renews the token a session passes on, shortly before it expires, for as
+   * long as the session lasts. Without a way to (no refresh token), the
+   * cluster refusing it ends the session.
+   */
+  #keepFresh(session: StoredSession, { expires, refreshToken }: Forwarded): void {
+    if (!refreshToken) return
+    const renew = async () => {
+      // Signed out meanwhile.
+      if (!this.sessions.get(session.id)) return
+      try {
+        const next = await this.oidc!.renew(refreshToken)
+        session.identity.token = next.token
+        // Providers that don't rotate refresh tokens keep taking the same one.
+        this.#keepFresh(session, { ...next, refreshToken: next.refreshToken ?? refreshToken })
+      } catch (error) {
+        log(`Renewing ${session.identity.user.name}’s token failed: ${(error as Error).message}`)
+        this.sessions.end(session.id, 'expired')
+      }
+    }
+    setTimeout(() => void renew(), Math.max(0, expires! - Date.now() - RENEW_EARLY_MS)).unref()
   }
 
   /** Back to the sign-in page, which says what went wrong; the details go to the log. */

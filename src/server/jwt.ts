@@ -32,14 +32,17 @@ export interface Expected {
 }
 
 /** The token's parts, decoded; throws when it isn't a JWT. */
-function decode(token: string): {
+function decode(
+  token: string,
+  what = 'The ID token',
+): {
   header: { alg?: string; kid?: string }
   claims: Claims
   signed: string
   signature: Buffer
 } {
   const [header, claims, signature] = token.split('.')
-  if (!header || !claims || signature === undefined) throw new Error('The ID token isn’t a JWT')
+  if (!header || !claims || signature === undefined) throw new Error(`${what} isn’t a JWT`)
   const json = (part: string) => JSON.parse(Buffer.from(part, 'base64url').toString('utf8'))
   return {
     header: json(header),
@@ -47,6 +50,16 @@ function decode(token: string): {
     signed: `${header}.${claims}`,
     signature: Buffer.from(signature, 'base64url'),
   }
+}
+
+/**
+ * When a token passed on to the API server expires (ms since the epoch);
+ * throws when it isn't a JWT (which the API server couldn't check) or doesn't say.
+ */
+export function expiryOf(token: string): number {
+  const { exp } = decode(token, 'The token to pass on').claims
+  if (typeof exp !== 'number') throw new Error('The token to pass on doesn’t say when it expires')
+  return exp * 1000
 }
 
 /** The key that signed the token, by its id (or the provider's only key). */

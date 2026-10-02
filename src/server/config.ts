@@ -21,6 +21,11 @@ export type AuthConfig =
       groupsClaim: string
       /** What the sign-in button calls the provider. */
       provider: string
+      /**
+       * Which of the person's own tokens requests carry, when the API server
+       * trusts the provider itself; unset, the server impersonates them.
+       */
+      forwardToken?: 'id' | 'access'
     }
   | {
       mode: 'proxy'
@@ -111,6 +116,7 @@ export function readConfig(env: NodeJS.ProcessEnv, rendererDir: string): ServerC
       usernameClaim: value('KUBESTACKS_OIDC_USERNAME_CLAIM') ?? 'email',
       groupsClaim: value('KUBESTACKS_OIDC_GROUPS_CLAIM') ?? 'groups',
       provider: value('KUBESTACKS_OIDC_PROVIDER_NAME') ?? 'single sign-on',
+      forwardToken: forwardToken(value('KUBESTACKS_OIDC_FORWARD_TOKEN')),
     }
   } else if (mode === 'proxy') {
     const signOut = value('KUBESTACKS_PROXY_SIGN_OUT_URL')
@@ -156,6 +162,14 @@ export function readConfig(env: NodeJS.ProcessEnv, rendererDir: string): ServerC
     viewsDir: value('KUBESTACKS_VIEWS_DIR') ?? '/etc/kubestacks/views',
     rendererDir,
   }
+}
+
+/** Which token requests carry: the ID token, the access token, or (unset) none. */
+function forwardToken(setting: string | undefined): 'id' | 'access' | undefined {
+  if (setting === undefined || setting === 'id' || setting === 'access') return setting
+  throw new ConfigError(
+    `KUBESTACKS_OIDC_FORWARD_TOKEN must be id, access or unset (impersonate), not "${setting}".`,
+  )
 }
 
 /** `auto` (detected), `off`, or the service to use. */

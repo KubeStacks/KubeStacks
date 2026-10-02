@@ -3,6 +3,7 @@
  * server acts as them in the cluster, impersonating them with its own credentials.
  */
 import { request as http, type Page } from '@playwright/test'
+import type { MockCluster } from '../mock-cluster/server.ts'
 import { startMockOidc, type MockOidc, type MockOidcOptions } from '../mock-oidc/server.ts'
 import { expect, freePort, test, type ServeOptions, type Served } from './fixtures.ts'
 
@@ -257,6 +258,116 @@ test('a provider that can’t be reached', async ({ page, serve }) => {
   expect(served.log()).toContain(
     'Couldn’t reach http://127.0.0.1:1/.well-known/openid-configuration',
   )
+})
+
+/** Makes the mock cluster accept what the provider issues, as an API server that trusts it does. */
+function trust(oidc: MockOidc, cluster: MockCluster) {
+  const issued: string[] = []
+  oidc.issued = (token, claims) => {
+    issued.push(token)
+    cluster.setUser(token, {
+      username: `oidc:${claims.email as string}`,
+      groups: (claims.groups as string[] | undefined) ?? [],
+    })
+  }
+  return issued
+}
+
+test('with a cluster that trusts the provider: people’s own tokens, renewed before they expire', async ({
+  page,
+  serve,
+  clusters,
+}) => {
+  // Tokens that last a minute and two seconds: renewed a minute early, so every two seconds.
+  const { oidc, served } = await withProvider(
+    serve,
+    { lifetime: 62 },
+    { KUBESTACKS_OIDC_FORWARD_TOKEN: 'id', KUBESTACKS_OIDC_SCOPES: 'openid email offline_access' },
+  )
+  const issued = trust(oidc, clusters.demo)
+  await page.goto(`${served.url}auth/sign-in?then=/cluster/demo/nodes`)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nodes')
+  // No impersonation: requests carry Alice's own ID token, and the cluster names her.
+  await expect
+    .poll(() => clusters.demo.requests.findLast((r) => r.path === '/api/v1/nodes'))
+    .toMatchObject({ user: 'oidc:alice@example.com' })
+  const first = clusters.demo.requests.findLast((r) => r.path === '/api/v1/nodes')!
+  expect(first.headers['impersonate-user']).toBeUndefined()
+  expect(first.headers.authorization).toBe(`Bearer ${issued[0]}`)
+
+  // Renewed before it expires, again and again; the first token stops working, the new ones don't.
+  const renewals = () =>
+    oidc.tokenRequests.filter((r) => r.body.get('grant_type') === 'refresh_token').length
+  await expect.poll(renewals, { timeout: 15_000 }).toBeGreaterThanOrEqual(2)
+  clusters.demo.setUser(issued[0]!, undefined)
+  await page
+    .getByRole('navigation', { name: 'Resources' })
+    .getByRole('link', { name: 'Pods' })
+    .click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Pods')
+  await expect
+    .poll(() => clusters.demo.requests.findLast((r) => r.path === '/api/v1/pods'))
+    .toMatchObject({ user: 'oidc:alice@example.com' })
+
+  // The provider stops renewing it: the session ends.
+  oidc.failing.add('token')
+  await expect(notice(page, 'Your session ended. Sign in again')).toBeVisible({ timeout: 15_000 })
+  expect(served.log()).toContain('Renewing alice@example.com’s token failed')
+  oidc.failing.delete('token')
+
+  // Signed out, nothing's renewed any more.
+  await page.getByRole('button', { name: 'Sign in with single sign-on' }).click()
+  await page.getByRole('button', { name: 'Signed in as alice@example.com' }).click()
+  await page.getByRole('button', { name: 'Sign out' }).click()
+  await expect(notice(page, 'You’ve signed out.')).toBeVisible()
+  const after = renewals()
+  await page.waitForTimeout(3_000)
+  expect(renewals()).toBe(after)
+  await oidc.close()
+})
+
+test('access tokens, refresh tokens that don’t change, and tokens a cluster couldn’t check', async ({
+  page,
+  serve,
+  clusters,
+}) => {
+  const { oidc, served } = await withProvider(
+    serve,
+    { lifetime: 62, refreshTokens: 'keep' },
+    { KUBESTACKS_OIDC_FORWARD_TOKEN: 'access' },
+  )
+  const issued = trust(oidc, clusters.demo)
+  await page.goto(`${served.url}auth/sign-in?then=/cluster/demo/nodes`)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nodes')
+  // The access token (the second issued): its audience is the cluster's.
+  await expect
+    .poll(
+      () =>
+        clusters.demo.requests.findLast((r) => r.path === '/api/v1/nodes')?.headers.authorization,
+    )
+    .toBe(`Bearer ${issued[1]}`)
+  // Renewed with the same refresh token each time.
+  const renewals = () =>
+    oidc.tokenRequests
+      .filter((r) => r.body.get('grant_type') === 'refresh_token')
+      .map((r) => r.body.get('refresh_token'))
+  await expect.poll(() => renewals().length, { timeout: 15_000 }).toBeGreaterThanOrEqual(2)
+  expect(new Set(renewals()).size).toBe(1)
+  await page.getByRole('button', { name: 'Signed in as alice@example.com' }).click()
+  await page.getByRole('button', { name: 'Sign out' }).click()
+
+  // Tokens the API server couldn't check aren't passed on.
+  for (const [tamper, reason] of [
+    [{ accessToken: undefined }, 'The provider sent no access token to pass on'],
+    [{ accessToken: 'opaque-token' }, 'The token to pass on isn’t a JWT'],
+    [{ accessClaims: { exp: undefined } }, 'The token to pass on doesn’t say when it expires'],
+  ] as const) {
+    oidc.tamper = tamper
+    await page.goto(`${served.url}auth/sign-in`)
+    await expect(notice(page, FAILED)).toBeVisible()
+    expect(served.log()).toContain(reason)
+  }
+  await oidc.close()
 })
 
 test('the server won’t act as Kubernetes’ own users, nor put anyone in their groups', async ({

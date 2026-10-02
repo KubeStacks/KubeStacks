@@ -27,7 +27,8 @@
             "scopes": { "type": "string", "minLength": 1 },
             "usernameClaim": { "type": "string", "minLength": 1 },
             "groupsClaim": { "type": "string", "minLength": 1 },
-            "providerName": { "type": "string" }
+            "providerName": { "type": "string" },
+            "forwardToken": { "enum": ["", "id", "access"] }
           }
         },
         "proxy": {

@@ -6,7 +6,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { SessionUser } from '@shared/server'
 import type { AuthConfig } from './config'
-import { keyId, verifyIdToken, type Jwk } from './jwt'
+import { expiryOf, keyId, verifyIdToken, type Jwk } from './jwt'
 
 type OidcConfig = Extract<AuthConfig, { mode: 'oidc' }>
 
@@ -15,6 +15,26 @@ interface Discovery {
   token_endpoint: string
   jwks_uri: string
   token_endpoint_auth_methods_supported?: string[]
+}
+
+interface TokenResponse {
+  id_token?: unknown
+  access_token?: unknown
+  refresh_token?: unknown
+}
+
+/** The person's own token, when KubeStacks passes it on to the API server. */
+export interface Forwarded {
+  token?: string
+  /** When it expires (ms since the epoch). */
+  expires?: number
+  /** For a new one before then, when the provider gave one. */
+  refreshToken?: string
+}
+
+/** Who signed in, and the token their requests carry, if they carry one. */
+export interface SignedIn extends Forwarded {
+  user: SessionUser
 }
 
 /** A sign-in on its way through the provider. */
@@ -57,36 +77,17 @@ export class OidcClient {
     return { url: url.href, pending }
   }
 
-  /** Finishes a sign-in: trades the code for an ID token, and says who it names. */
-  async finish(code: string, pending: PendingSignIn): Promise<SessionUser> {
-    const discovery = await this.#discover()
-    const body = new URLSearchParams({
+  /**
+   * Finishes a sign-in: trades the code for tokens, and says who the ID
+   * token names (and, with forwardToken, which token their requests carry).
+   */
+  async finish(code: string, pending: PendingSignIn): Promise<SignedIn> {
+    const tokens = await this.#token({
       grant_type: 'authorization_code',
       code,
       redirect_uri: this.redirectUri,
       code_verifier: pending.verifier,
-      client_id: this.config.clientId,
     })
-    const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' }
-    const { clientSecret } = this.config
-    if (clientSecret) {
-      // HTTP Basic unless the provider only takes the secret in the body.
-      if (
-        discovery.token_endpoint_auth_methods_supported?.includes('client_secret_basic') === false
-      ) {
-        body.set('client_secret', clientSecret)
-      } else {
-        const credentials = `${encodeURIComponent(this.config.clientId)}:${encodeURIComponent(clientSecret)}`
-        headers.Authorization = `Basic ${Buffer.from(credentials).toString('base64')}`
-      }
-    }
-    const tokens = (await fetchJson(discovery.token_endpoint, {
-      method: 'POST',
-      headers,
-      body,
-    })) as {
-      id_token?: unknown
-    }
     if (typeof tokens.id_token !== 'string') throw new Error('The provider sent no ID token')
     const token = tokens.id_token
     let keys = await this.#jwks()
@@ -104,7 +105,50 @@ export class OidcClient {
       throw new Error(`The ID token has no ${this.config.usernameClaim} claim to name the user by`)
     }
     const groups = ([] as unknown[]).concat(claims[this.config.groupsClaim] ?? [])
-    return { name, groups: groups.filter((group): group is string => typeof group === 'string') }
+    return {
+      user: { name, groups: groups.filter((group): group is string => typeof group === 'string') },
+      ...this.#forwarded(tokens),
+    }
+  }
+
+  /** A new token to pass on, before the one passed on now expires. */
+  async renew(refreshToken: string): Promise<Forwarded> {
+    return this.#forwarded(
+      await this.#token({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+    )
+  }
+
+  /** The token requests carry, if KubeStacks passes one on: the one forwardToken names. */
+  #forwarded(tokens: TokenResponse): Forwarded {
+    const which = this.config.forwardToken
+    if (!which) return {}
+    const token = which === 'id' ? tokens.id_token : tokens.access_token
+    if (typeof token !== 'string') throw new Error(`The provider sent no ${which} token to pass on`)
+    const refreshToken = typeof tokens.refresh_token === 'string' ? tokens.refresh_token : undefined
+    return { token, expires: expiryOf(token), refreshToken }
+  }
+
+  /** Asks the provider's token endpoint, as this client (HTTP Basic unless it only takes the body). */
+  async #token(grant: Record<string, string>): Promise<TokenResponse> {
+    const discovery = await this.#discover()
+    const body = new URLSearchParams({ ...grant, client_id: this.config.clientId })
+    const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' }
+    const { clientSecret } = this.config
+    if (clientSecret) {
+      if (
+        discovery.token_endpoint_auth_methods_supported?.includes('client_secret_basic') === false
+      ) {
+        body.set('client_secret', clientSecret)
+      } else {
+        const credentials = `${encodeURIComponent(this.config.clientId)}:${encodeURIComponent(clientSecret)}`
+        headers.Authorization = `Basic ${Buffer.from(credentials).toString('base64')}`
+      }
+    }
+    return (await fetchJson(discovery.token_endpoint, {
+      method: 'POST',
+      headers,
+      body,
+    })) as TokenResponse
   }
 
   #discover(): Promise<Discovery> {

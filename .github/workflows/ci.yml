@@ -43,6 +43,11 @@ jobs:
               --set auth.oidc.issuer=https://dex.example.com --set auth.oidc.clientId=kubestacks \
               --set ingress.enabled=true --set networkPolicy.enabled=true >/dev/null
           done
+          # Single sign-on with people's own tokens: no impersonation, so no ClusterRole.
+          ! helm template kubestacks charts/kubestacks --set auth.mode=oidc \
+            --set url=https://kubestacks.example.com --set auth.oidc.issuer=https://dex.example.com \
+            --set auth.oidc.clientId=kubestacks --set auth.oidc.forwardToken=id \
+            | grep -q 'kind: ClusterRole$'
 
   e2e:
     name: E2E (${{ matrix.os }}, ${{ matrix.shard }}/2)

@@ -341,6 +341,16 @@ test('the server says what’s wrong with its configuration, and stops', async (
       'KUBESTACKS_URL must be an http or https URL, not "https://".',
     ],
     [
+      {
+        KUBESTACKS_AUTH: 'oidc',
+        KUBESTACKS_OIDC_ISSUER: 'https://auth.example.com',
+        KUBESTACKS_URL: 'https://kubestacks.example.com',
+        KUBESTACKS_OIDC_CLIENT_ID: 'kubestacks',
+        KUBESTACKS_OIDC_FORWARD_TOKEN: 'both',
+      },
+      'KUBESTACKS_OIDC_FORWARD_TOKEN must be id, access or unset (impersonate), not "both".',
+    ],
+    [
       { KUBESTACKS_AUTH: 'proxy', KUBESTACKS_PROXY_SIGN_OUT_URL: 'javascript:alert(1)' },
       'KUBESTACKS_PROXY_SIGN_OUT_URL must be an http or https URL, not "javascript:alert(1)".',
     ],

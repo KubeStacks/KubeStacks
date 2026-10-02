@@ -44,6 +44,12 @@ auth:
     groupsClaim: groups
     # On the sign-in button: "Sign in with Okta".
     providerName: ''
+    # When the API server itself trusts the provider (its --oidc-* flags, a structured
+    # authentication config, EKS's OIDC identity providers…): `id` or `access`, the
+    # token requests carry instead of KubeStacks impersonating people. KubeStacks then
+    # needs no permissions, and renews tokens with refresh tokens (ask for them:
+    # offline_access, for most providers). Unset, it impersonates.
+    forwardToken: ''
 
   proxy:
     userHeader: X-Forwarded-User
