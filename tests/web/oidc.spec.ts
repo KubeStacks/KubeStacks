@@ -260,11 +260,14 @@ test('a provider that can’t be reached', async ({ page, serve }) => {
   )
 })
 
-/** Makes the mock cluster accept what the provider issues, as an API server that trusts it does. */
+/**
+ * Makes the mock cluster accept what the provider issues, as an API server that trusts it does.
+ * Returns the ID and access tokens issued so far, as `Authorization` headers.
+ */
 function trust(oidc: MockOidc, cluster: MockCluster) {
-  const issued: string[] = []
-  oidc.issued = (token, claims) => {
-    issued.push(token)
+  const issued = { id: [] as string[], access: [] as string[] }
+  oidc.issued = (token, kind, claims) => {
+    issued[kind].push(`Bearer ${token}`)
     cluster.setUser(token, {
       username: `oidc:${claims.email as string}`,
       groups: (claims.groups as string[] | undefined) ?? [],
@@ -293,13 +296,14 @@ test('with a cluster that trusts the provider: people’s own tokens, renewed be
     .toMatchObject({ user: 'oidc:alice@example.com' })
   const first = clusters.demo.requests.findLast((r) => r.path === '/api/v1/nodes')!
   expect(first.headers['impersonate-user']).toBeUndefined()
-  expect(first.headers.authorization).toBe(`Bearer ${issued[0]}`)
+  // Her ID token, or one renewed already (each lasts two seconds before it's due).
+  expect(issued.id).toContain(first.headers.authorization)
 
   // Renewed before it expires, again and again; the first token stops working, the new ones don't.
   const renewals = () =>
     oidc.tokenRequests.filter((r) => r.body.get('grant_type') === 'refresh_token').length
   await expect.poll(renewals, { timeout: 15_000 }).toBeGreaterThanOrEqual(2)
-  clusters.demo.setUser(issued[0]!, undefined)
+  clusters.demo.setUser(issued.id[0]!.slice('Bearer '.length), undefined)
   await page
     .getByRole('navigation', { name: 'Resources' })
     .getByRole('link', { name: 'Pods' })
@@ -339,13 +343,13 @@ test('access tokens, refresh tokens that don’t change, and tokens a cluster co
   const issued = trust(oidc, clusters.demo)
   await page.goto(`${served.url}auth/sign-in?then=/cluster/demo/nodes`)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nodes')
-  // The access token (the second issued): its audience is the cluster's.
+  // Her access token (its audience is the cluster's), or one renewed already.
   await expect
-    .poll(
-      () =>
-        clusters.demo.requests.findLast((r) => r.path === '/api/v1/nodes')?.headers.authorization,
-    )
-    .toBe(`Bearer ${issued[1]}`)
+    .poll(() => clusters.demo.requests.findLast((r) => r.path === '/api/v1/nodes'))
+    .toMatchObject({ user: 'oidc:alice@example.com' })
+  expect(issued.access).toContain(
+    clusters.demo.requests.findLast((r) => r.path === '/api/v1/nodes')!.headers.authorization,
+  )
   // Renewed with the same refresh token each time.
   const renewals = () =>
     oidc.tokenRequests

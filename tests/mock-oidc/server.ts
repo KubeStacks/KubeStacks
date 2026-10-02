@@ -53,8 +53,8 @@ export interface MockOidc {
   rotateKeys(): void
   /** What the token endpoint was sent. */
   tokenRequests: { authorization?: string; body: URLSearchParams }[]
-  /** Called with each ID and access token it issues, and the person's claims. */
-  issued?: (token: string, claims: Record<string, unknown>) => void
+  /** Called with each ID and access token it issues, which one it is, and the person's claims. */
+  issued?: (token: string, kind: 'id' | 'access', claims: Record<string, unknown>) => void
   close(): Promise<void>
 }
 
@@ -125,8 +125,11 @@ export async function startMockOidc(options: MockOidcOptions): Promise<MockOidc>
         : options.accessTokens === 'opaque'
           ? randomBytes(16).toString('hex')
           : jwt(person, 'kubernetes', {}, { claims: tamper.accessClaims })
-    for (const token of [idToken, accessToken]) {
-      if (typeof token === 'string') provider.issued?.(token, person)
+    for (const [token, kind] of [
+      [idToken, 'id'],
+      [accessToken, 'access'],
+    ] as const) {
+      if (typeof token === 'string') provider.issued?.(token, kind, person)
     }
     const refreshToken = withRefreshToken ? randomBytes(16).toString('hex') : undefined
     if (refreshToken) refreshTokens.set(refreshToken, person)
