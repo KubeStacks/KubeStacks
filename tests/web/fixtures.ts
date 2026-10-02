@@ -90,6 +90,7 @@ export function startServer(
   child.stdout!.setEncoding('utf8').on('data', (chunk: string) => (output += chunk))
   child.stderr!.setEncoding('utf8').on('data', (chunk: string) => (output += chunk))
   const exited = new Promise<number | null>((done) => child.once('exit', (code) => done(code)))
+  let stopping: Promise<void> | undefined
   return new Promise((resolve, reject) => {
     const listening = (chunk: string) => {
       const found = / at (http:\/\/[^\s;]+)/.exec(output)
@@ -102,17 +103,22 @@ export function startServer(
         helmDir,
         process: child,
         log: () => output,
-        async stop() {
-          if (child.exitCode !== null) return
-          if (INSTRUMENTED) {
-            // Windows can't stop a process gracefully: its coverage is asked for first.
-            await new Promise<void>((saved) => {
-              child.once('message', () => saved())
-              child.send('kubestacks:coverage')
-            })
-          }
-          child.kill('SIGTERM')
-          await exited
+        // Once: a test may stop it, and then the fixture does. (On Windows a killed process
+        // has no exit code, so that can't tell.)
+        stop() {
+          stopping ??= (async () => {
+            if (child.exitCode !== null) return
+            if (INSTRUMENTED) {
+              // Windows can't stop a process gracefully: its coverage is asked for first.
+              await new Promise<void>((saved) => {
+                child.once('message', () => saved())
+                child.send('kubestacks:coverage')
+              })
+            }
+            child.kill('SIGTERM')
+            await exited
+          })()
+          return stopping
         },
       })
       void chunk
