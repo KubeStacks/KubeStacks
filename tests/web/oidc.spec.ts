@@ -355,6 +355,8 @@ test('access tokens, refresh tokens that don’t change, and tokens a cluster co
   expect(new Set(renewals()).size).toBe(1)
   await page.getByRole('button', { name: 'Signed in as alice@example.com' }).click()
   await page.getByRole('button', { name: 'Sign out' }).click()
+  // Signing out reloads the page: done before going elsewhere.
+  await expect(notice(page, 'You’ve signed out.')).toBeVisible()
 
   // Tokens the API server couldn't check aren't passed on.
   for (const [tamper, reason] of [
@@ -385,6 +387,7 @@ test('the server won’t act as Kubernetes’ own users, nor put anyone in their
 
   await page.getByRole('button', { name: 'Signed in as eve' }).click()
   await page.getByRole('button', { name: 'Sign out' }).click()
+  await expect(notice(page, 'You’ve signed out.')).toBeVisible()
   oidc.person = { sub: 'system:admin' }
   await page.goto(`${served.url}auth/sign-in`)
   await expect(
