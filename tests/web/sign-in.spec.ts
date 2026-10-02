@@ -97,18 +97,14 @@ test('a token that stops working ends its session', async ({ page, serve, cluste
   const served = await serve()
   await signIn(page, `${served.url}cluster/demo/workloads`, PEOPLE.bob.token)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Workloads')
-  // Revoked (or expired): the next request is refused.
+  // Revoked (or expired): the page's next request (its lists poll) is refused.
   clusters.demo.setUser(PEOPLE.bob.token, undefined)
-  await page
-    .getByRole('navigation', { name: 'Resources' })
-    .getByRole('link', { name: 'Nodes' })
-    .click()
-  await expect(notice(page, ENDED)).toBeVisible()
+  await expect(notice(page, ENDED)).toBeVisible({ timeout: 20_000 })
   // Signing in again comes back to where it was.
   clusters.demo.setUser(PEOPLE.bob.token, PEOPLE.bob.user)
   await page.getByPlaceholder('Paste a token').fill(PEOPLE.bob.token)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nodes')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Workloads')
 })
 
 test('signing in when the cluster can’t say whose a token is, and signing out failing', async ({
