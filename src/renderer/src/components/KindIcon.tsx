@@ -11,8 +11,10 @@ import {
   Cpu,
   Database,
   FileCode2,
+  Flame,
   Gauge,
   GitBranch,
+  GitMerge,
   Globe,
   HardDrive,
   KeyRound,
@@ -28,15 +30,17 @@ import {
   Rocket,
   Route,
   Server,
+  ServerCog,
   Shapes,
   ShieldCheck,
   SquareStack,
   Timer,
+  Waypoints,
   Workflow,
   type LucideIcon,
 } from 'lucide-react'
 import { apiGroupOf, isCustomGroup, type BuiltinKind, type ResourceKind } from '@shared/resources'
-import { viewFor, type ViewIconName } from '@renderer/lib/views'
+import { viewFor, type AddOn, type ViewIconName } from '@renderer/lib/views'
 
 export const KIND_ICONS: Record<BuiltinKind, LucideIcon> = {
   Node: Server,
@@ -69,8 +73,10 @@ export const VIEW_ICONS: Record<ViewIconName, LucideIcon> = {
   boxes: Boxes,
   cloud: Cloud,
   database: Database,
+  flame: Flame,
   gauge: Gauge,
   'git-branch': GitBranch,
+  'git-merge': GitMerge,
   globe: Globe,
   'key-round': KeyRound,
   layers: Layers,
@@ -83,8 +89,10 @@ export const VIEW_ICONS: Record<ViewIconName, LucideIcon> = {
   rocket: Rocket,
   route: Route,
   server: Server,
+  'server-cog': ServerCog,
   'shield-check': ShieldCheck,
   timer: Timer,
+  waypoints: Waypoints,
   workflow: Workflow,
 }
 
@@ -97,7 +105,17 @@ export function kindIcon(kind: ResourceKind): LucideIcon {
   return isCustomGroup(apiGroupOf(kind)) ? Puzzle : Shapes
 }
 
+/** An add-on's icon: its own, or the one for custom resources. */
+export function addOnIcon(addOn: AddOn): LucideIcon {
+  return VIEW_ICONS[addOn.icon ?? 'puzzle']
+}
+
 /** A kind's icon, as an element. */
 export function KindIcon({ kind, className }: { kind: ResourceKind; className?: string }) {
   return createElement(kindIcon(kind), { className, 'aria-hidden': true })
+}
+
+/** An add-on's icon, as an element. */
+export function AddOnIcon({ addOn, className }: { addOn: AddOn; className?: string }) {
+  return createElement(addOnIcon(addOn), { className, 'aria-hidden': true })
 }
