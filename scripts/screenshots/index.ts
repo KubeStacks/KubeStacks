@@ -15,7 +15,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { _electron as electron, chromium, type Browser, type Page } from '@playwright/test'
 import { startMockOidc, type MockOidc } from '../../tests/mock-oidc/server.ts'
@@ -109,17 +109,21 @@ async function startArtifactHub() {
 }
 
 /** The desktop app in a theme, against the mock clusters, in a home and profile of its own. */
-async function launchDesktop(theme: Theme, env: Record<string, string>) {
+async function launchDesktop(theme: Theme, kubeconfig: string, env: Record<string, string>) {
   const home = mkdtempSync(join(tmpdir(), 'kubestacks-screenshots-home-'))
   writeFileSync(join(home, 'settings.json'), JSON.stringify({ theme }))
+  // Started where the kubeconfig's .kube folder is, and pointed at it from there: the clusters
+  // page shows the path, the same wherever that is.
+  const cwd = dirname(dirname(kubeconfig))
   const app = await electron.launch({
+    cwd,
     // Shown without a window on screen (see tests/e2e/harness.cjs), at 2× whatever the screen.
     args: [
       '-r',
       resolve('tests/e2e/harness.cjs'),
       '-r',
       resolve('scripts/screenshots/harness.cjs'),
-      '.',
+      resolve('.'),
       `--user-data-dir=${home}`,
       '--force-device-scale-factor=2',
       // Drawn in software: on the GPU, things come out a little differently from time to time.
@@ -129,6 +133,7 @@ async function launchDesktop(theme: Theme, env: Record<string, string>) {
     env: {
       ...process.env,
       ...env,
+      KUBECONFIG: relative(cwd, kubeconfig),
       HOME: home,
       USERPROFILE: home,
       TZ: 'UTC',
@@ -332,8 +337,7 @@ const servers = new Map<string, Awaited<ReturnType<typeof startServer>>>()
 try {
   const desktop = screens.filter((screen) => screen.app === 'desktop')
   for (const theme of desktop.length > 0 ? THEMES : []) {
-    const app = await launchDesktop(theme, {
-      KUBECONFIG: clusters.kubeconfig,
+    const app = await launchDesktop(theme, clusters.kubeconfig, {
       KUBESTACKS_ARTIFACT_HUB_URL: hub.url,
     })
     try {

@@ -2,7 +2,9 @@
  * The mock clusters the screenshots are taken of, in a process of their own
  * with the clock stopped (see still.ts), so the screenshot script's own
  * timers keep running. Prints the kubeconfig's path, then runs until its
- * input closes. Addresses and paths are shown on screen, so they're fixed.
+ * input closes. Addresses are shown on screen, so they're fixed. The
+ * kubeconfig is .kube/config in a folder of its own (the app is started
+ * there, so the clusters page names it the same way every time).
  */
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -14,9 +16,6 @@ import {
   writeKubeconfig,
 } from '../../tests/mock-cluster/kubeconfig.ts'
 import { EPOCH, stopClock } from './still.ts'
-
-/** Where the kubeconfig is, as the clusters page says. */
-export const KUBECONFIG_DIR = '/tmp/kubestacks'
 
 /** The ports they answer on, and one where nothing does. */
 const PORTS = { demo: 46443, sandbox: 46444, large: 46445, offline: 46446 }
@@ -43,9 +42,9 @@ if (import.meta.main) {
       )
     },
   )
-  mkdirSync(KUBECONFIG_DIR, { recursive: true })
+  mkdirSync(join(dir, '.kube'))
   const kubeconfig = writeKubeconfig(
-    KUBECONFIG_DIR,
+    join(dir, '.kube'),
     {
       currentContext: CLUSTERS.production,
       clusters: [
@@ -74,7 +73,6 @@ if (import.meta.main) {
   process.stdin.on('end', () => {
     void clusters.close().then(() => {
       rmSync(dir, { recursive: true, force: true })
-      rmSync(KUBECONFIG_DIR, { recursive: true, force: true })
       process.exit(0)
     })
   })
