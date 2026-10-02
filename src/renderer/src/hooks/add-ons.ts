@@ -1,5 +1,5 @@
-import type { ResourceDefinition, ResourceKind } from '@shared/resources'
-import { allAddOns, type AddOn } from '@renderer/lib/views'
+import { apiGroupOf, type ResourceDefinition, type ResourceKind } from '@shared/resources'
+import { allAddOns, everyKindOf, type AddOn } from '@renderer/lib/views'
 import { useResources } from './resources'
 import { useViews } from './views'
 
@@ -16,9 +16,17 @@ export interface ServedAddOn {
 export function useAddOns(): ServedAddOn[] {
   // Subscribes to the user's add-ons, and to what the cluster serves.
   useViews()
-  const served = new Map((useResources().data ?? []).map((r) => [r.kind, r]))
+  const resources = useResources().data ?? []
+  const served = new Map(resources.map((r) => [r.kind, r]))
+  // Every kind of a group: the ones the cluster serves, by name.
+  const kindsOf = (kind: ResourceKind) =>
+    kind === everyKindOf(kind)
+      ? resources
+          .filter((r) => r.group === apiGroupOf(kind))
+          .sort((a, b) => a.label.localeCompare(b.label))
+      : (served.get(kind) ?? [])
   return allAddOns()
-    .map((addOn) => ({ addOn, kinds: addOn.kinds.flatMap((kind) => served.get(kind) ?? []) }))
+    .map((addOn) => ({ addOn, kinds: addOn.kinds.flatMap(kindsOf) }))
     .filter(({ kinds }) => kinds.length > 0)
     .sort((a, b) => a.addOn.label.localeCompare(b.addOn.label, undefined, { sensitivity: 'base' }))
 }

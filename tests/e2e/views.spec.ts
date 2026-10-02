@@ -191,7 +191,7 @@ apiVersion: kubestacks.dev/v1alpha1
 kind: View
 metadata: { name: wrong-relations }
 spec:
-  kinds: [{ group: example.com, kind: Gadget }]
+  kinds: [{ group: example.com, kind: Gadget }, { kind: '*' }]
   related:
     - { name: Everything, kind: Pod }
     - { name: Listed, kind: Pod, labels: [1] }
@@ -285,6 +285,7 @@ test('your own views: they replace KubeStacks’, and what’s wrong with them i
     'spec.actions[0].patch: should be a patch (an object or a list), not a string',
     'spec.actions[1]: patches are an object for type merge, and a list for type json',
     'spec.actions[2]: patches are an object for type merge, and a list for type json',
+    'wrong-relations: spec.kinds[1]: every kind (*) is of a group: name it',
     'wrong-relations: spec.related[0]: needs labels or a fieldSelector to find them',
     'spec.related[1].labels: should be a map of fields, not a list',
     'spec.related[2].labels.a: should be text, not a number',
@@ -770,6 +771,17 @@ spec:
     - { group: example.com, kind: Widget }
     - { group: example.com, kind: Database }
 `,
+    // A view for every kind of a group.
+    'example.yaml': `
+apiVersion: kubestacks.dev/v1alpha1
+kind: View
+metadata: { name: everything-example }
+spec:
+  kinds:
+    - { group: example.com, kind: '*' }
+  columns:
+    - { name: Made of, path: .spec.engine }
+`,
   })
   await openCluster(page)
   const nav = sidebar(page)
@@ -784,6 +796,13 @@ spec:
   await nav.getByRole('link', { name: 'Toys', exact: true }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Toys')
   await expect(page.getByRole('navigation', { name: 'Toys' })).toContainText('AllWidgets')
+  await page
+    .getByRole('navigation', { name: 'Toys' })
+    .getByRole('link', { name: /^Databases/ })
+    .click()
+  await expect(
+    page.getByRole('grid', { name: 'Databases' }).getByRole('columnheader', { name: 'Made of' }),
+  ).toBeVisible()
   await nav.getByRole('link', { name: 'GitOps', exact: true }).click()
   await expect(page.getByRole('navigation', { name: 'GitOps' })).toContainText('AllKustomizations3')
   await expect(page.getByRole('navigation', { name: 'GitOps' })).not.toContainText('HelmReleases')

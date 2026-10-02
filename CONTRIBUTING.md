@@ -61,7 +61,10 @@ issue.
 
 1. Pin the tool's CRDs: add its release to `tests/views/crds/sources.json`, under the
    add-on's name, with the URLs of its CRD manifests, and run `npm run crds -- <name>`. That
-   keeps what the check needs of them in `tests/views/crds/<name>.json`.
+   keeps what the check needs of them in `tests/views/crds/<name>.json`. A chart's templates
+   work too (`"helm": true`), and for a tool whose operator creates its CRDs itself, the JSON
+   Schema of each kind will do (KubeVirt's come from the
+   [CRDs catalog](https://github.com/datreeio/CRDs-catalog)).
 2. Write `src/renderer/src/views/<name>.yaml`: the `AddOn`, then a `View` for each kind (or
    group of kinds) worth more than the generic columns. Status rules are where views help
    most: say what healthy, in progress, failing and paused look like for this tool.

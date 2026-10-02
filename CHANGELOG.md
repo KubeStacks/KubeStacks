@@ -11,9 +11,12 @@ All notable changes to KubeStacks are documented here. The format follows
 - Add-ons: every tool a cluster runs gets an entry in the sidebar, leading to everything of
   its kinds in one list (what's failing first) with a tab for each kind. KubeStacks has
   add-ons for Argo CD, Argo Rollouts, Argo Workflows, cert-manager, Cilium, CloudNativePG,
-  Cluster API, Crossplane, External Secrets, Flux, Gateway API, Istio, Karpenter, KEDA,
-  Kyverno, the Prometheus operator, Strimzi, Tekton, Traefik, Trivy, Velero, the Vertical Pod
-  Autoscaler and volume snapshots; you can write your own, or replace KubeStacks'.
+  Cluster API, Crossplane, Elastic (ECK), External Secrets, Flux, Gatekeeper, Gateway API,
+  Istio, Karpenter, KEDA, Knative Serving, KubeVirt, Kyverno, Linkerd, Longhorn, the
+  Prometheus operator, Rook Ceph, Sealed Secrets, Strimzi, Tekton, Traefik, Trivy, Velero,
+  VictoriaMetrics, the Vertical Pod Autoscaler and volume snapshots; you can write your own,
+  or replace KubeStacks'. A view or an add-on can name every kind of an API group, like the
+  constraints Gatekeeper makes from its templates.
 - Karpenter's add-on opens on an overview: its node pools against their limits, the nodes
   they launched and the ones launching, the mix of instance types, capacity types and zones,
   what's being disrupted and why, and the pods waiting for a node.

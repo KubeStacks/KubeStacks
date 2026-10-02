@@ -110,7 +110,8 @@ function resolves(shape: Shape, steps: Step[]): boolean {
     if ('key' in step) {
       at = field(at, step.key)
     } else {
-      at = at.items
+      // Every item of a list, or every value of a map.
+      at = at.items ?? at.additionalProperties
       if (at && 'filter' in step && !resolves(at, step.filter.path)) return false
     }
   }
@@ -258,7 +259,8 @@ test('every add-on is checked against its operator’s CRDs, and names their kin
       problems.push(`${addOn.source}: add-on ${addOn.name} has no CRDs in ${CRDS}/sources.json`)
       continue
     }
-    for (const kind of addOn.kinds) {
+    // (Every kind of a group, `*.group`, are made by the tool, and not known until they are.)
+    for (const kind of addOn.kinds.filter((k) => !k.startsWith('*.'))) {
       if (!crds.get(kind)?.from.startsWith(`${addOn.name} `)) {
         problems.push(`${addOn.source}: add-on ${addOn.name} names ${kind}, which its CRDs don’t`)
       }
@@ -270,7 +272,9 @@ test('every add-on is checked against its operator’s CRDs, and names their kin
 test('every kind a view is for has a CRD here, unless it’s one of Kubernetes’ own', () => {
   const problems = views.flatMap((view) =>
     view.kinds
-      .filter((kind) => isCustomGroup(apiGroupOf(kind)) && !crds.has(kind))
+      .filter(
+        (kind) => isCustomGroup(apiGroupOf(kind)) && !kind.startsWith('*.') && !crds.has(kind),
+      )
       .map((kind) => `${view.source}: ${view.name} is for ${kind}, which no CRD here defines`),
   )
   expect(problems).toEqual([])

@@ -236,3 +236,69 @@ test('an add-on’s page opened before the cluster says what it serves, or when 
   await expect(heading(page)).toHaveText('Flux')
   await expect(rows(page, 'Flux')).toHaveCount(5)
 })
+
+/** The CRD Gatekeeper makes for a constraint template: a kind of constraint of its own. */
+const constraintKind = (kind: string) => ({
+  apiVersion: 'apiextensions.k8s.io/v1',
+  kind: 'CustomResourceDefinition',
+  metadata: { name: `${kind.toLowerCase()}.constraints.gatekeeper.sh` },
+  spec: {
+    group: 'constraints.gatekeeper.sh',
+    names: {
+      kind,
+      plural: kind.toLowerCase(),
+      singular: kind.toLowerCase(),
+      listKind: `${kind}List`,
+    },
+    scope: 'Cluster',
+    versions: [
+      {
+        name: 'v1beta1',
+        served: true,
+        storage: true,
+        schema: {
+          openAPIV3Schema: { type: 'object', 'x-kubernetes-preserve-unknown-fields': true },
+        },
+      },
+    ],
+  },
+})
+
+test('Gatekeeper’s constraints: a tab for each kind its templates made', async ({
+  page,
+  clusters,
+}) => {
+  for (const kind of ['K8sRequiredLabels', 'K8sAllowedRepos']) {
+    clusters.demo.upsert(constraintKind(kind))
+  }
+  const audited = new Date().toISOString()
+  clusters.demo.upsert({
+    apiVersion: 'constraints.gatekeeper.sh/v1beta1',
+    kind: 'K8sRequiredLabels',
+    metadata: { name: 'must-have-owner', creationTimestamp: audited },
+    spec: { enforcementAction: 'dryrun' },
+    status: {
+      auditTimestamp: audited,
+      totalViolations: 2,
+      violations: [
+        { kind: 'Namespace', name: 'legacy', message: 'you must provide labels: {"owner"}' },
+        { kind: 'Namespace', name: 'batch', message: 'you must provide labels: {"owner"}' },
+      ],
+    },
+  })
+  clusters.demo.upsert({
+    apiVersion: 'constraints.gatekeeper.sh/v1beta1',
+    kind: 'K8sAllowedRepos',
+    metadata: { name: 'trusted-registries', creationTimestamp: audited },
+    spec: {},
+    status: { auditTimestamp: audited, totalViolations: 0 },
+  })
+  await openCluster(page)
+  await sidebar(page).getByRole('link', { name: 'Gatekeeper', exact: true }).click()
+  // Each kind of constraint, by name, with what the last audit found.
+  await expect(page.getByRole('navigation', { name: 'Gatekeeper' })).toContainText(
+    'AllK8sAllowedRepos1K8sRequiredLabels1',
+  )
+  await expect(row(page, 'Gatekeeper', 'must-have-owner')).toContainText('2 violations')
+  await expect(row(page, 'Gatekeeper', 'trusted-registries')).toContainText('No violations')
+})

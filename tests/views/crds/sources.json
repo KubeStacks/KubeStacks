@@ -70,6 +70,12 @@
       "https://raw.githubusercontent.com/crossplane/crossplane/{version}/cluster/crds/apiextensions.crossplane.io_compositions.yaml"
     ]
   },
+  "eck": {
+    "version": "v3.5.0",
+    "files": [
+      "https://raw.githubusercontent.com/elastic/cloud-on-k8s/{version}/config/crds/v1/all-crds.yaml"
+    ]
+  },
   "external-secrets": {
     "version": "v2.11.0",
     "files": [
@@ -83,6 +89,20 @@
   "flux": {
     "version": "v2.9.6",
     "files": ["https://github.com/fluxcd/flux2/releases/download/{version}/install.yaml"]
+  },
+  "gatekeeper": {
+    "version": "v3.23.1",
+    "files": [
+      "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/{version}/charts/gatekeeper/crds/constrainttemplate-customresourcedefinition.yaml",
+      "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/{version}/charts/gatekeeper/crds/config-customresourcedefinition.yaml",
+      "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/{version}/charts/gatekeeper/crds/assign-customresourcedefinition.yaml",
+      "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/{version}/charts/gatekeeper/crds/assignmetadata-customresourcedefinition.yaml",
+      "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/{version}/charts/gatekeeper/crds/assignimage-customresourcedefinition.yaml",
+      "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/{version}/charts/gatekeeper/crds/modifyset-customresourcedefinition.yaml",
+      "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/{version}/charts/gatekeeper/crds/expansiontemplate-customresourcedefinition.yaml",
+      "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/{version}/charts/gatekeeper/crds/provider-customresourcedefinition.yaml",
+      "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/{version}/charts/gatekeeper/crds/syncset-customresourcedefinition.yaml"
+    ]
   },
   "gateway-api": {
     "version": "v1.6.2",
@@ -114,6 +134,45 @@
       "https://github.com/kedacore/keda/releases/download/{version}/keda-{number}-crds.yaml"
     ]
   },
+  "knative-serving": {
+    "version": "knative-v1.23.0",
+    "files": ["https://github.com/knative/serving/releases/download/{version}/serving-crds.yaml"]
+  },
+  "kubevirt": {
+    "version": "d373c2da9702bc9509a004db83e57263fe3bdfc1",
+    "files": [
+      {
+        "schema": "https://raw.githubusercontent.com/datreeio/CRDs-catalog/{version}/kubevirt.io/virtualmachine_v1.json",
+        "group": "kubevirt.io",
+        "kind": "VirtualMachine",
+        "apiVersion": "v1"
+      },
+      {
+        "schema": "https://raw.githubusercontent.com/datreeio/CRDs-catalog/{version}/kubevirt.io/virtualmachineinstance_v1.json",
+        "group": "kubevirt.io",
+        "kind": "VirtualMachineInstance",
+        "apiVersion": "v1"
+      },
+      {
+        "schema": "https://raw.githubusercontent.com/datreeio/CRDs-catalog/{version}/kubevirt.io/virtualmachineinstancemigration_v1.json",
+        "group": "kubevirt.io",
+        "kind": "VirtualMachineInstanceMigration",
+        "apiVersion": "v1"
+      },
+      {
+        "schema": "https://raw.githubusercontent.com/datreeio/CRDs-catalog/{version}/cdi.kubevirt.io/datavolume_v1beta1.json",
+        "group": "cdi.kubevirt.io",
+        "kind": "DataVolume",
+        "apiVersion": "v1beta1"
+      },
+      {
+        "schema": "https://raw.githubusercontent.com/datreeio/CRDs-catalog/{version}/cdi.kubevirt.io/datasource_v1beta1.json",
+        "group": "cdi.kubevirt.io",
+        "kind": "DataSource",
+        "apiVersion": "v1beta1"
+      }
+    ]
+  },
   "kyverno": {
     "version": "v1.19.1",
     "files": [
@@ -127,10 +186,61 @@
       "https://raw.githubusercontent.com/kyverno/kyverno/{version}/config/crds/policyreport/wgpolicyk8s.io_clusterpolicyreports.yaml"
     ]
   },
+  "linkerd": {
+    "version": "edge-26.9.3",
+    "files": [
+      {
+        "url": "https://raw.githubusercontent.com/linkerd/linkerd2/{version}/charts/linkerd-crds/templates/policy/server.yaml",
+        "helm": true
+      },
+      {
+        "url": "https://raw.githubusercontent.com/linkerd/linkerd2/{version}/charts/linkerd-crds/templates/policy/server-authorization.yaml",
+        "helm": true
+      },
+      {
+        "url": "https://raw.githubusercontent.com/linkerd/linkerd2/{version}/charts/linkerd-crds/templates/policy/authorization-policy.yaml",
+        "helm": true
+      },
+      {
+        "url": "https://raw.githubusercontent.com/linkerd/linkerd2/{version}/charts/linkerd-crds/templates/policy/httproute.yaml",
+        "helm": true
+      },
+      {
+        "url": "https://raw.githubusercontent.com/linkerd/linkerd2/{version}/charts/linkerd-crds/templates/policy/meshtls-authentication.yaml",
+        "helm": true
+      },
+      {
+        "url": "https://raw.githubusercontent.com/linkerd/linkerd2/{version}/charts/linkerd-crds/templates/policy/network-authentication.yaml",
+        "helm": true
+      },
+      {
+        "url": "https://raw.githubusercontent.com/linkerd/linkerd2/{version}/charts/linkerd-crds/templates/policy/egress-network.yaml",
+        "helm": true
+      },
+      {
+        "url": "https://raw.githubusercontent.com/linkerd/linkerd2/{version}/charts/linkerd-crds/templates/serviceprofile.yaml",
+        "helm": true
+      }
+    ]
+  },
+  "longhorn": {
+    "version": "v1.13.0",
+    "files": ["https://raw.githubusercontent.com/longhorn/longhorn/{version}/deploy/longhorn.yaml"]
+  },
   "prometheus-operator": {
     "version": "v0.94.1",
     "files": [
       "https://github.com/prometheus-operator/prometheus-operator/releases/download/{version}/stripped-down-crds.yaml"
+    ]
+  },
+  "rook-ceph": {
+    "version": "v1.20.8",
+    "files": ["https://raw.githubusercontent.com/rook/rook/{version}/deploy/examples/crds.yaml"]
+  },
+  "sealed-secrets": {
+    "version": "v0.40.0",
+    "files": [
+      "https://raw.githubusercontent.com/bitnami-labs/sealed-secrets/{version}/helm/sealed-secrets/crds/bitnami.com_sealedsecrets.yaml"
     ]
   },
   "strimzi": {
@@ -174,6 +284,10 @@
     "files": [
       "https://raw.githubusercontent.com/kubernetes/autoscaler/{version}/vertical-pod-autoscaler/deploy/vpa-v1-crd-gen.yaml"
     ]
+  },
+  "victoriametrics-operator": {
+    "version": "v0.75.0",
+    "files": ["https://github.com/VictoriaMetrics/operator/releases/download/{version}/crd.yaml"]
   },
   "volume-snapshots": {
     "version": "v8.6.0",

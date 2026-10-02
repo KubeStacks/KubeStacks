@@ -13,7 +13,13 @@
  */
 import { parseAllDocuments } from 'yaml'
 import { checkPath, jsonPath } from '@shared/jsonpath'
-import { isBuiltinKind, kindFor, type ResourceCategory, type ResourceKind } from '@shared/resources'
+import {
+  apiGroupOf,
+  isBuiltinKind,
+  kindFor,
+  type ResourceCategory,
+  type ResourceKind,
+} from '@shared/resources'
 import type { Health, Status } from './health'
 
 export const VIEW_API_VERSION = 'kubestacks.dev/v1alpha1'
@@ -234,8 +240,13 @@ const conditionShape: Shape = {
       : 'needs exactly one of path, all or any',
 }
 
+/** A kind, or every kind of a group (`kind: '*'`), like the constraints Gatekeeper's templates make. */
 const kindsShape: Shape = {
-  list: { fields: { group: 'string', kind: { shape: 'string', required: true } } },
+  list: {
+    fields: { group: 'string', kind: { shape: 'string', required: true } },
+    refine: (k) =>
+      k.kind === '*' && !k.group ? 'every kind (*) is of a group: name it' : undefined,
+  },
   nonEmpty: true,
 }
 
@@ -571,8 +582,18 @@ export function setLocalViews(views: View[], addOns: AddOn[]): void {
 }
 
 /** The view for a kind: the user's if they have one, else KubeStacks'. */
+/** `*.constraints.gatekeeper.sh`: how a view or an add-on names every kind of a group. */
+export function everyKindOf(kind: ResourceKind): ResourceKind {
+  return `*.${apiGroupOf(kind)}`
+}
+
+/**
+ * The view for a kind: the user's if they have one, else KubeStacks'; one
+ * for the kind itself before one for every kind of its group.
+ */
 export function viewFor(kind: ResourceKind): View | undefined {
-  return local.get(kind) ?? shipped.get(kind)
+  const every = everyKindOf(kind)
+  return local.get(kind) ?? local.get(every) ?? shipped.get(kind) ?? shipped.get(every)
 }
 
 export function shippedViews(): View[] {
