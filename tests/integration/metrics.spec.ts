@@ -155,8 +155,9 @@ test('right-sizing asks a real Prometheus for a week, a namespace at a time', as
     .getByRole('link', { name: 'Right-sizing' })
     .click()
   await inNamespace(page, NS)
-  // A fresh cluster has minutes of history: too little to recommend anything.
-  const web = page.getByRole('row', { name: 'Deployment web' })
+  // A fresh cluster has minutes of history: too little to recommend anything. (Other
+  // namespaces' rows can show for a moment, until this namespace's list loads.)
+  const web = page.getByRole('row', { name: 'Deployment web', exact: true }).filter({ hasText: NS })
   await expect(web).toContainText('Too new', { timeout: 60_000 })
   await expect(page.getByRole('alert')).toHaveCount(0)
 })
