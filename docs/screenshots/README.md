@@ -163,6 +163,14 @@ Screens are listed in [`scripts/screenshots/screens.ts`](../../scripts/screensho
 | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
 | [![Usage over the last six hours from Prometheus, by namespace.](metrics-light-1x.webp)](metrics-light.webp) | [![Usage over the last six hours from Prometheus, by namespace.](metrics-dark-1x.webp)](metrics-dark.webp) |
 
+### Right-sizing
+
+`right-sizing`: What each workload should request from a week of usage, with why, and its week against the request, the recommendation and the limit.
+
+| Light                                                                                                                                                                                           | Dark                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![What each workload should request from a week of usage, with why, and its week against the request, the recommendation and the limit.](right-sizing-light-1x.webp)](right-sizing-light.webp) | [![What each workload should request from a week of usage, with why, and its week against the request, the recommendation and the limit.](right-sizing-dark-1x.webp)](right-sizing-dark.webp) |
+
 ### A pod's usage
 
 `pod-metrics`: A pod's CPU and memory over time, against its requests and limits.
@@ -242,6 +250,22 @@ Screens are listed in [`scripts/screenshots/screens.ts`](../../scripts/screensho
 | Light                                                                                                                          | Dark                                                                                                                         |
 | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | [![A cert-manager certificate, shown with KubeStacks' view of it.](custom-resource-light-1x.webp)](custom-resource-light.webp) | [![A cert-manager certificate, shown with KubeStacks' view of it.](custom-resource-dark-1x.webp)](custom-resource-dark.webp) |
+
+### An add-on
+
+`add-on`: Flux's add-on: everything Flux runs in one list, what's failing first, and a tab for each of its kinds.
+
+| Light                                                                                                                                                 | Dark                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![Flux's add-on: everything Flux runs in one list, what's failing first, and a tab for each of its kinds.](add-on-light-1x.webp)](add-on-light.webp) | [![Flux's add-on: everything Flux runs in one list, what's failing first, and a tab for each of its kinds.](add-on-dark-1x.webp)](add-on-dark.webp) |
+
+### Karpenter
+
+`karpenter`: Karpenter's node pools against their limits, the nodes they launched, and what's being replaced or waiting for a node.
+
+| Light                                                                                                                                                                      | Dark                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [![Karpenter's node pools against their limits, the nodes they launched, and what's being replaced or waiting for a node.](karpenter-light-1x.webp)](karpenter-light.webp) | [![Karpenter's node pools against their limits, the nodes they launched, and what's being replaced or waiting for a node.](karpenter-dark-1x.webp)](karpenter-dark.webp) |
 
 ### Helm releases
 
